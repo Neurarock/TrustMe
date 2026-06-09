@@ -61,7 +61,7 @@ wheels = [
 ]
 
 [[package]]
-name = "hackathon-minimal-cli-agent"
+name = "ralio-client-agent"
 version = "0.1.0"
 source = { virtual = "." }
 dependencies = [

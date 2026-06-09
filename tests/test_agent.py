@@ -15,6 +15,7 @@ from agent import (
     CommandError,
     CommandRunner,
     DEFAULT_OPENAI_MODEL,
+    DEFAULT_RALIO_SKILL_URL,
     MinimalCliAgent,
     ModelClient,
     ModelError,
@@ -68,6 +69,22 @@ class ScriptedModel(ModelClient):
         if not self.turns:
             raise AssertionError("No scripted model turn configured.")
         return self.turns.pop(0)
+
+
+class FakeSkillUrlResponse:
+    status = 200
+
+    def __init__(self, text: str) -> None:
+        self.text = text
+
+    def __enter__(self) -> FakeSkillUrlResponse:
+        return self
+
+    def __exit__(self, *args: object) -> None:
+        return None
+
+    def read(self, _size: int) -> bytes:
+        return self.text.encode("utf-8")
 
 
 def _completed(
@@ -142,7 +159,7 @@ def test_cli_command_tool_rejects_out_of_range_timeout(
 def test_cli_command_tool_scrubs_openai_env_vars(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    monkeypatch.setenv("HOME", "/tmp/hackathon-home")
+    monkeypatch.setenv("HOME", "/tmp/ralio-client-agent-home")
     monkeypatch.setenv("OPENAI_API_KEY", "secret-key")
     monkeypatch.setenv("OPENAI_MODEL", "private-model")
     monkeypatch.setenv("RALIO_API_URL", "https://api.ralio.co")
@@ -157,7 +174,7 @@ def test_cli_command_tool_scrubs_openai_env_vars(
     tool.run(["demo-cli", "--json", "status"])
 
     _command, env, _timeout_seconds = runner.calls[0]
-    assert env["HOME"] == "/tmp/hackathon-home"
+    assert env["HOME"] == "/tmp/ralio-client-agent-home"
     assert "OPENAI_API_KEY" not in env
     assert "OPENAI_MODEL" not in env
     assert "SUPABASE_SECRET_KEY" not in env
@@ -337,6 +354,81 @@ def test_build_agent_uses_default_openai_model(
     assert isinstance(agent.model, OpenAIResponsesModelClient)
     assert agent.model.model == DEFAULT_OPENAI_MODEL
     assert DEFAULT_OPENAI_MODEL == "gpt-5.4"
+
+
+def test_build_agent_loads_default_ralio_skill_url(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    calls: list[tuple[str, int]] = []
+
+    def fake_urlopen(url: str, *, timeout: int) -> FakeSkillUrlResponse:
+        calls.append((url, timeout))
+        return FakeSkillUrlResponse("# Hosted Ralio skill")
+
+    monkeypatch.setattr("urllib.request.urlopen", fake_urlopen)
+    args = parse_args(["--allow-command", "ralio"])
+
+    agent = build_agent_from_args(args)
+
+    assert calls == [(DEFAULT_RALIO_SKILL_URL, 10)]
+    assert agent.skill_texts == (
+        f"# Skill URL: {DEFAULT_RALIO_SKILL_URL}\n\n# Hosted Ralio skill",
+    )
+
+
+def test_build_agent_can_skip_default_ralio_skill_url(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    def fake_urlopen(url: str, *, timeout: int) -> FakeSkillUrlResponse:
+        raise AssertionError(f"Unexpected skill URL fetch: {url} {timeout}")
+
+    monkeypatch.setattr("urllib.request.urlopen", fake_urlopen)
+    args = parse_args(["--allow-command", "ralio", "--no-default-ralio-skill"])
+
+    agent = build_agent_from_args(args)
+
+    assert agent.skill_texts == ()
+
+
+def test_build_agent_loads_explicit_skill_url(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    calls: list[tuple[str, int]] = []
+
+    def fake_urlopen(url: str, *, timeout: int) -> FakeSkillUrlResponse:
+        calls.append((url, timeout))
+        return FakeSkillUrlResponse("Use demo-cli carefully.")
+
+    monkeypatch.setattr("urllib.request.urlopen", fake_urlopen)
+    args = parse_args(
+        [
+            "--allow-command",
+            "demo-cli",
+            "--skill-url",
+            "https://example.com/skill.md",
+        ]
+    )
+
+    agent = build_agent_from_args(args)
+
+    assert calls == [("https://example.com/skill.md", 10)]
+    assert agent.skill_texts == (
+        "# Skill URL: https://example.com/skill.md\n\nUse demo-cli carefully.",
+    )
+
+
+def test_build_agent_rejects_non_https_skill_url() -> None:
+    args = parse_args(
+        [
+            "--allow-command",
+            "demo-cli",
+            "--skill-url",
+            "http://example.com/skill.md",
+        ]
+    )
+
+    with pytest.raises(AgentError, match="HTTPS URL"):
+        build_agent_from_args(args)
 
 
 def test_build_agent_rejects_malformed_numeric_env(

@@ -1,11 +1,34 @@
 [project]
-name = "hackathon-minimal-cli-agent"
+name = "ralio-client-agent"
 version = "0.1.0"
-description = "Minimal CLI-driven agent starter for connecting to Ralio."
+description = "Reference implementation for a client agent that connects to a Ralio Agent through the Ralio CLI."
+readme = "README.md"
+license = "MIT"
 requires-python = ">=3.11"
+authors = [
+    { name = "Ralio" },
+]
+keywords = [
+    "agent",
+    "cli",
+    "ralio",
+    "reference-implementation",
+]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+]
 dependencies = [
     "openai>=1.30",
 ]
+
+[project.urls]
+Homepage = "https://github.com/Ralioco/ralio-client-agent"
+Repository = "https://github.com/Ralioco/ralio-client-agent"
+Issues = "https://github.com/Ralioco/ralio-client-agent/issues"
 
 [dependency-groups]
 dev = [

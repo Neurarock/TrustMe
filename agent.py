@@ -1,8 +1,8 @@
-"""Minimal CLI-driven agent loop for hackathon participants.
+"""Minimal CLI-driven reference client agent for Ralio.
 
 This sample is intentionally independent from any platform SDK or CLI internals.
 The only integration point is a constrained command runner. Platform-specific
-behavior should be supplied as external instructions or skill files.
+behavior is supplied as external instructions or skill sources.
 """
 
 from __future__ import annotations
@@ -12,6 +12,9 @@ import json
 import os
 import subprocess
 import sys
+import urllib.error
+import urllib.parse
+import urllib.request
 import uuid
 from abc import ABC, abstractmethod
 from collections.abc import Mapping, Sequence
@@ -35,6 +38,9 @@ class ModelError(AgentError):
 DEFAULT_COMMAND_TIMEOUT_SECONDS = 180
 DEFAULT_MAX_OUTPUT_CHARS = 12_000
 DEFAULT_MAX_TOOL_ROUNDS = 8
+DEFAULT_RALIO_SKILL_URL = "https://console.ralio.co/skill.md"
+DEFAULT_SKILL_URL_TIMEOUT_SECONDS = 10
+DEFAULT_MAX_SKILL_CHARS = 200_000
 MAX_COMMAND_TIMEOUT_SECONDS = 600
 TRUNCATION_MARKER = "\n[output truncated]"
 COMMAND_ENV_ALLOWLIST = (
@@ -250,8 +256,8 @@ class OpenAIResponsesModelClient(ModelClient):
                 from openai import OpenAI, OpenAIError  # noqa: PLC0415
             except ImportError as exc:
                 raise ModelError(
-                    "The openai package is not installed. Run "
-                    "`python -m pip install openai` in this environment."
+                    "The openai package is not installed. Install this project's "
+                    "dependencies first."
                 ) from exc
             try:
                 self._client = OpenAI()
@@ -515,7 +521,10 @@ def build_agent_from_args(args: argparse.Namespace) -> MinimalCliAgent:
         default=DEFAULT_MAX_OUTPUT_CHARS,
     )
     allowed_commands = _allowed_commands_from_args(args)
-    skill_texts = _load_skill_files(args.skill_file or [])
+    skill_texts = _load_skills(
+        skill_files=args.skill_file or [],
+        skill_urls=_skill_urls_from_args(args, allowed_commands),
+    )
 
     cli = CliCommandTool(
         allowed_commands=allowed_commands,
@@ -577,22 +586,73 @@ def _allowed_commands_from_args(args: argparse.Namespace) -> tuple[str, ...]:
     return tuple(dict.fromkeys(commands))
 
 
-def _load_skill_files(paths: Sequence[str]) -> tuple[str, ...]:
-    """Read external skill files to append to the model instructions."""
+def _skill_urls_from_args(
+    args: argparse.Namespace,
+    allowed_commands: tuple[str, ...],
+) -> tuple[str, ...]:
+    """Resolve external skill URLs from args and Ralio defaults."""
+    urls: list[str] = []
+    if "ralio" in allowed_commands and not args.no_default_ralio_skill:
+        urls.append(DEFAULT_RALIO_SKILL_URL)
+    urls.extend(args.skill_url or [])
+    return tuple(dict.fromkeys(urls))
+
+
+def _load_skills(
+    *,
+    skill_files: Sequence[str],
+    skill_urls: Sequence[str],
+) -> tuple[str, ...]:
+    """Read external skill sources to append to the model instructions."""
     skill_texts: list[str] = []
-    for raw_path in paths:
+    for raw_path in skill_files:
         path = Path(raw_path).expanduser()
         try:
             text = path.read_text(encoding="utf-8")
         except OSError as exc:
             raise AgentError(f"Could not read skill file {raw_path!r}: {exc}") from exc
         skill_texts.append(f"# Skill file: {path}\n\n{text.strip()}")
+    for raw_url in skill_urls:
+        skill_texts.append(_load_skill_url(raw_url))
     return tuple(skill_texts)
+
+
+def _load_skill_url(raw_url: str) -> str:
+    """Fetch one HTTPS skill URL to append to the model instructions."""
+    parsed = urllib.parse.urlparse(raw_url)
+    if parsed.scheme != "https" or not parsed.netloc:
+        raise AgentError(f"Skill URL must be an HTTPS URL: {raw_url!r}")
+
+    try:
+        with urllib.request.urlopen(  # noqa: S310 - user/default HTTPS skill URL.
+            raw_url,
+            timeout=DEFAULT_SKILL_URL_TIMEOUT_SECONDS,
+        ) as response:
+            status = getattr(response, "status", 200)
+            if status >= 400:
+                raise AgentError(f"Could not fetch skill URL {raw_url!r}: HTTP {status}")
+            content = response.read(DEFAULT_MAX_SKILL_CHARS + 1)
+    except AgentError:
+        raise
+    except (OSError, urllib.error.URLError) as exc:
+        raise AgentError(f"Could not fetch skill URL {raw_url!r}: {exc}") from exc
+
+    if len(content) > DEFAULT_MAX_SKILL_CHARS:
+        raise AgentError(
+            f"Skill URL {raw_url!r} is larger than {DEFAULT_MAX_SKILL_CHARS} bytes."
+        )
+
+    try:
+        text = content.decode("utf-8")
+    except UnicodeDecodeError as exc:
+        raise AgentError(f"Skill URL {raw_url!r} did not return UTF-8 text.") from exc
+
+    return f"# Skill URL: {raw_url}\n\n{text.strip()}"
 
 
 def parse_args(argv: list[str]) -> argparse.Namespace:
     """Parse command-line arguments."""
-    parser = argparse.ArgumentParser(description="Run the minimal hackathon CLI agent.")
+    parser = argparse.ArgumentParser(description="Run the Ralio client agent.")
     parser.add_argument(
         "instruction",
         nargs="*",
@@ -618,6 +678,19 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
         "--skill-file",
         action="append",
         help="Markdown/text skill file to append to the model instructions.",
+    )
+    parser.add_argument(
+        "--skill-url",
+        action="append",
+        help="HTTPS Markdown/text skill URL to append to the model instructions.",
+    )
+    parser.add_argument(
+        "--no-default-ralio-skill",
+        action="store_true",
+        help=(
+            "Do not automatically fetch the hosted Ralio skill when `ralio` is "
+            "allowed."
+        ),
     )
     parser.add_argument(
         "--session-id",

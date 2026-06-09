@@ -9,16 +9,33 @@ loop from scratch.
 
 The Python agent does not import or wrap Ralio SDK, API, or CLI internals. It
 has one generic tool: `run_cli_command`. That tool executes allowed CLI commands
-as argv arrays without a shell. Product-specific behavior is supplied through
-external skill files.
+as argv arrays without a shell. When `ralio` is allowed, the agent automatically
+loads the hosted Ralio CLI skill from
+[`https://console.ralio.co/skill.md`](https://console.ralio.co/skill.md).
+
+## Status
+
+This is a reference implementation, not production infrastructure. It is
+intended to be small, inspectable, and easy to adapt when building a client
+agent that connects to Ralio through the CLI.
 
 ## Setup
 
 From the repo root:
 
 ```bash
-python -m pip install openai
+python -m venv .venv
+source .venv/bin/activate
+python -m pip install -r requirements.txt
 ```
+
+For development with the locked dependency set, you can use `uv` instead:
+
+```bash
+uv sync --dev
+```
+
+After `uv sync`, run commands with `uv run` or activate the generated `.venv`.
 
 Install and authenticate whatever CLI the agent should use. For Ralio:
 
@@ -46,8 +63,7 @@ Run the agent and keep it open until you close it:
 
 ```bash
 CLI_AGENT_ALLOWED_COMMANDS="ralio" \
-python agent.py \
-  --skill-file skills/ralio_cli.md
+python agent.py
 ```
 
 Useful session commands:
@@ -61,7 +77,6 @@ Start with an initial prompt and then keep chatting:
 ```bash
 CLI_AGENT_ALLOWED_COMMANDS="ralio" \
 python agent.py \
-  --skill-file skills/ralio_cli.md \
   "Find available Ralio agents and list account names only."
 ```
 
@@ -71,7 +86,6 @@ Run a single request and exit:
 CLI_AGENT_ALLOWED_COMMANDS="ralio" \
 python agent.py \
   --once \
-  --skill-file skills/ralio_cli.md \
   "Check whether a 50 GBP office-supplies payment is possible. Do not make the payment."
 ```
 
@@ -79,9 +93,14 @@ You can avoid the env var and pass the allowlist explicitly:
 
 ```bash
 python agent.py \
-  --allow-command ralio \
-  --skill-file skills/ralio_cli.md
+  --allow-command ralio
 ```
+
+By default, `--allow-command ralio` or `CLI_AGENT_ALLOWED_COMMANDS="ralio"`
+causes the agent to fetch and inject the hosted skill at startup. You can append
+additional instructions with `--skill-file` or `--skill-url`. Use
+`--no-default-ralio-skill` only when you intentionally want to supply your own
+Ralio instructions.
 
 ## Design
 
@@ -90,13 +109,26 @@ python agent.py \
 - `OpenAIResponsesModelClient` is the model adapter.
 - `CliCommandTool` is the only integration adapter. It runs configured
   executables without a shell and returns stdout, stderr, and exit code.
-- `--skill-file` appends external Markdown/text instructions to the model.
+- `--skill-file` and `--skill-url` append external Markdown/text instructions to
+  the model.
+- `--allow-command ralio` automatically appends the hosted Ralio CLI skill from
+  `https://console.ralio.co/skill.md`, unless `--no-default-ralio-skill` is set.
 - `--session-id` exposes a stable generic id that skills can use for CLI
   conversation, session, or correlation ids.
 
 To adapt this for another platform, allow a different executable and provide a
-different skill file. The agent code should not need to change.
+different skill file or URL. The agent code should not need to change.
 
 For a casual high-level walkthrough of agent-to-agent communication and how this
 sample connects to Ralio through the CLI, see
 [`AGENT_TO_AGENT.md`](AGENT_TO_AGENT.md).
+
+## Contributing
+
+Public contributions are welcome through pull requests. See
+[`CONTRIBUTING.md`](CONTRIBUTING.md) and [`SECURITY.md`](SECURITY.md) before
+opening issues or pull requests.
+
+## License
+
+This project is licensed under the MIT License. See [`LICENSE`](LICENSE).

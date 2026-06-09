@@ -43,7 +43,7 @@ the payment-platform work.
 The pieces:
 
 - **Human**: asks normal questions like "what agents can I use?"
-- **Your agent**: the thing you build or use during the hackathon.
+- **Your agent**: the client agent you build or run.
 - **Ralio CLI**: the bridge. It handles auth, tokens, DPoP, API calls, and
   platform transport.
 - **Ralio platform agent**: the agent configured in Ralio that can answer
@@ -54,7 +54,7 @@ the boundary.
 
 ## Why Use the CLI Boundary?
 
-Because it keeps the hackathon agent small.
+Because it keeps the client agent small.
 
 ```text
 Hard path:
@@ -90,7 +90,7 @@ run_cli_command(command: string[], timeout_seconds?: int)
 ```
 
 It does not have a `ralio_chat` tool. It does not have a Ralio SDK client. It
-does not know Ralio by default.
+does not import Ralio internals.
 
 Instead, you give it two things:
 
@@ -98,9 +98,11 @@ Instead, you give it two things:
 1. Permission to run a command:
    --allow-command ralio
 
-2. Instructions for how to use that command:
-   --skill-file skills/ralio_cli.md
+2. The hosted Ralio CLI skill:
+   https://console.ralio.co/skill.md
 ```
+
+The sample injects that hosted skill automatically when `ralio` is allowed.
 
 That is the whole trick.
 
@@ -117,7 +119,7 @@ That is the whole trick.
 +------------------+
 
 +------------------+
-| skill file       |
+| hosted skill URL |
 | "how to use it"  |
 +------------------+
 ```
@@ -188,7 +190,9 @@ In diagram form:
 From the repo root:
 
 ```bash
-python -m pip install openai
+python -m venv .venv
+source .venv/bin/activate
+python -m pip install -r requirements.txt
 ```
 
 Install the Ralio CLI:
@@ -239,8 +243,7 @@ If `ralio` is already on your `PATH`:
 ```bash
 OPENAI_API_KEY="your-openai-api-key" \
 uv run python agent.py \
-  --allow-command ralio \
-  --skill-file skills/ralio_cli.md
+  --allow-command ralio
 ```
 
 If `ralio` is installed somewhere custom, put that directory on `PATH` before
@@ -250,8 +253,7 @@ running the agent:
 PATH="/path/to/ralio/bin:$PATH" \
 OPENAI_API_KEY="your-openai-api-key" \
 uv run python agent.py \
-  --allow-command ralio \
-  --skill-file skills/ralio_cli.md
+  --allow-command ralio
 ```
 
 Now ask it something:
@@ -292,7 +294,8 @@ Your own agent needs five things:
 2. A generic command tool
 3. A command allowlist containing "ralio"
 4. The Ralio CLI installed and authenticated
-5. The Ralio skill text, or equivalent instructions
+5. The Ralio skill text from https://console.ralio.co/skill.md, or equivalent
+   instructions
 ```
 
 Minimal shape:
@@ -394,7 +397,7 @@ Good:
 
 ```text
 Your agent:
-  - reads a skill file
+  - loads the hosted Ralio skill
   - runs allowlisted CLI commands
   - treats CLI output as truth
   - summarizes results for the user
@@ -406,7 +409,7 @@ Bad:
 Your agent:
   - imports Ralio internals
   - guesses account state
-  - builds payment APIs during the hackathon
+  - builds payment APIs instead of using the CLI boundary
   - allows arbitrary shell commands
 ```
 
@@ -438,8 +441,7 @@ Install the CLI or put its install directory on `PATH`:
 ```bash
 PATH="/path/to/ralio/bin:$PATH" \
 uv run python agent.py \
-  --allow-command ralio \
-  --skill-file skills/ralio_cli.md
+  --allow-command ralio
 ```
 
 The goal is for this to work:
@@ -489,6 +491,6 @@ Specialist does the platform work.
 Host explains the result.
 ```
 
-That is agent to agent communication for this hackathon: one agent using a CLI
-to reach another agent, with a small loop in the middle and no giant integration
-project hiding under the table.
+That is agent to agent communication for this reference implementation: one
+agent using a CLI to reach another agent, with a small loop in the middle and no
+giant integration project hiding under the table.
