@@ -67,11 +67,12 @@ ralio auth agent --ticket ralio-reg-...
 ralio auth status
 ```
 
-Set the OpenAI key and allow the executable the agent may run:
+Configure local environment variables:
 
 ```bash
-export OPENAI_API_KEY="your-openai-api-key"
-export CLI_AGENT_ALLOWED_COMMANDS="ralio"
+cp .env.example .env
+# Edit .env and set OPENAI_API_KEY.
+source .env
 ```
 
 ## Run Interactively
@@ -98,10 +99,16 @@ python agent.py \
 Run a single request and exit:
 
 ```bash
-CLI_AGENT_ALLOWED_COMMANDS="ralio" \
 python agent.py \
   --once \
   "Check whether a 50 GBP office-supplies payment is possible. Do not make the payment."
+```
+
+You can avoid `CLI_AGENT_ALLOWED_COMMANDS` and pass the allowlist explicitly:
+
+```bash
+python agent.py \
+  --allow-command ralio
 ```
 
 By default, `--allow-command ralio` or `CLI_AGENT_ALLOWED_COMMANDS="ralio"`
