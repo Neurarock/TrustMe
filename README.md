@@ -19,6 +19,17 @@ This is a reference implementation, not production infrastructure. It is
 intended to be small, inspectable, and easy to adapt when building a client
 agent that connects to Ralio through the CLI.
 
+## Prerequisites
+
+- Python 3.11 or newer.
+- An OpenAI API key for the model client.
+- The Ralio CLI installed and available on `PATH`.
+- Access to a Ralio Agent. For machine callers, this usually means a
+  `ralio-reg-...` registration ticket for `ralio auth agent`; for local
+  development, an already authenticated Ralio CLI session can also work.
+- Network access to OpenAI, the Ralio API, and the hosted Ralio skill at
+  `https://console.ralio.co/skill.md`.
+
 ## Setup
 
 From the repo root:
