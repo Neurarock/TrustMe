@@ -25,10 +25,7 @@ agent that connects to Ralio through the CLI.
 - An OpenAI API key for the model client.
 - The Ralio CLI installed and available on `PATH`.
 - Access to a Ralio Agent. For machine callers, this usually means a
-  `ralio-reg-...` registration ticket for `ralio auth agent`; for local
-  development, an already authenticated Ralio CLI session can also work.
-- Network access to OpenAI, the Ralio API, and the hosted Ralio skill at
-  `https://console.ralio.co/skill.md`.
+  `ralio-reg-...` registration ticket for `ralio auth agent`.
 
 ## Setup
 
