@@ -45,8 +45,7 @@ uv sync --dev
 
 After `uv sync`, run commands with `uv run` or activate the generated `.venv`.
 
-Install whatever CLI the agent should use. For Ralio, use Homebrew on macOS
-arm64 or Linux x86_64:
+To install the Ralio CLI, use Homebrew on macOS arm64 or Linux x86_64:
 
 ```bash
 brew install ralioco/tap/ralio
@@ -75,17 +74,11 @@ export OPENAI_API_KEY="your-openai-api-key"
 export CLI_AGENT_ALLOWED_COMMANDS="ralio"
 ```
 
-The sample defaults to OpenAI model `gpt-5.4`. The Ralio CLI defaults to the
-production API at `https://api.ralio.co` when `RALIO_API_URL` is unset. Leave
-`RALIO_API_URL` unset for production; set it only when intentionally targeting a
-local or development API.
-
 ## Run Interactively
 
 Run the agent and keep it open until you close it:
 
 ```bash
-CLI_AGENT_ALLOWED_COMMANDS="ralio" \
 python agent.py
 ```
 
@@ -98,7 +91,6 @@ Useful session commands:
 Start with an initial prompt and then keep chatting:
 
 ```bash
-CLI_AGENT_ALLOWED_COMMANDS="ralio" \
 python agent.py \
   "Find available Ralio agents and list account names only."
 ```
@@ -110,13 +102,6 @@ CLI_AGENT_ALLOWED_COMMANDS="ralio" \
 python agent.py \
   --once \
   "Check whether a 50 GBP office-supplies payment is possible. Do not make the payment."
-```
-
-You can avoid the env var and pass the allowlist explicitly:
-
-```bash
-python agent.py \
-  --allow-command ralio
 ```
 
 By default, `--allow-command ralio` or `CLI_AGENT_ALLOWED_COMMANDS="ralio"`
@@ -139,10 +124,7 @@ Ralio instructions.
 - `--session-id` exposes a stable generic id that skills can use for CLI
   conversation, session, or correlation ids.
 
-To adapt this for another platform, allow a different executable and provide a
-different skill file or URL. The agent code should not need to change.
-
-For a casual high-level walkthrough of agent-to-agent communication and how this
+For a high-level walkthrough of agent-to-agent communication and how this
 sample connects to Ralio through the CLI, see
 [`AGENT_TO_AGENT.md`](AGENT_TO_AGENT.md).
 
