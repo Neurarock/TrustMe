@@ -45,10 +45,25 @@ uv sync --dev
 
 After `uv sync`, run commands with `uv run` or activate the generated `.venv`.
 
-Install and authenticate whatever CLI the agent should use. For Ralio:
+Install whatever CLI the agent should use. For Ralio, use Homebrew on macOS
+arm64 or Linux x86_64:
 
 ```bash
 brew install ralioco/tap/ralio
+```
+
+Or use the install script:
+
+```bash
+curl -fsSL https://releases.ralio.co/install.sh | bash
+```
+
+The install script auto-detects macOS arm64 or Linux x64 and installs the
+`ralio` binary to `/usr/local/bin`.
+
+Authenticate the Ralio CLI:
+
+```bash
 ralio auth agent --ticket ralio-reg-...
 ralio auth status
 ```
