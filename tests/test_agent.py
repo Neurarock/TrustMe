@@ -21,6 +21,8 @@ from agent import (
     ModelError,
     ModelTurn,
     OpenAIResponsesModelClient,
+    THINKING_FINISHED,
+    THINKING_STARTED,
     ToolCall,
     build_agent_from_args,
     parse_args,
@@ -30,8 +32,14 @@ from agent import (
 
 
 class FakeRunner(CommandRunner):
-    def __init__(self, responses: list[subprocess.CompletedProcess[str]]) -> None:
+    def __init__(
+        self,
+        responses: list[subprocess.CompletedProcess[str]],
+        *,
+        stream_chunks: list[tuple[str, str]] | None = None,
+    ) -> None:
         self.responses = responses
+        self.stream_chunks = stream_chunks or []
         self.calls: list[tuple[list[str], Mapping[str, str], int]] = []
 
     def run(
@@ -40,8 +48,12 @@ class FakeRunner(CommandRunner):
         *,
         env: Mapping[str, str],
         timeout_seconds: int,
+        output_callback: Any | None = None,
     ) -> subprocess.CompletedProcess[str]:
         self.calls.append((command, env, timeout_seconds))
+        if output_callback is not None:
+            for stream_name, chunk in self.stream_chunks:
+                output_callback(stream_name, chunk)
         if not self.responses:
             raise AssertionError("No fake subprocess response configured.")
         return self.responses.pop(0)
@@ -128,6 +140,32 @@ def test_cli_command_tool_runs_allowed_command_and_returns_exit_code() -> None:
     assert result.returncode == 7
     assert result.stdout == '{"status": "ok"}'
     assert result.stderr == "recoverable warning"
+
+
+def test_cli_command_tool_reports_approval_wait_progress_once() -> None:
+    runner = FakeRunner(
+        [_completed("done")],
+        stream_chunks=[
+            ("stdout", "Awaiting human approval\n"),
+            ("stdout", "Awaiting human approval\n"),
+        ],
+    )
+    tool = CliCommandTool(
+        allowed_commands=("demo-cli",),
+        runner=runner,
+    )
+    progress_messages: list[str] = []
+
+    result = tool.run(
+        ["demo-cli", "chat"],
+        progress_callback=progress_messages.append,
+    )
+
+    assert result.stdout == "done"
+    assert progress_messages == [
+        "Status: request submitted and waiting for human approval. "
+        "I'll keep waiting for the CLI result."
+    ]
 
 
 def test_cli_command_tool_rejects_unallowed_command() -> None:
@@ -252,6 +290,43 @@ def test_agent_loop_executes_generic_cli_tool_then_returns_final_text() -> None:
     assert json.loads(output["stdout"])["accounts"][0]["name"] == "Main"
 
 
+def test_agent_reports_thinking_activity_around_model_calls() -> None:
+    runner = FakeRunner([_completed({"status": "ok"})])
+    model = ScriptedModel(
+        [
+            ModelTurn(
+                tool_calls=(
+                    ToolCall(
+                        id="call-1",
+                        name="run_cli_command",
+                        arguments={"command": ["demo-cli", "status"]},
+                    ),
+                )
+            ),
+            ModelTurn(text="Done."),
+        ]
+    )
+    agent = MinimalCliAgent(
+        model=model,
+        cli=CliCommandTool(
+            allowed_commands=("demo-cli",),
+            runner=runner,
+        ),
+        config=AgentLoopConfig(max_tool_rounds=2),
+    )
+    events: list[str] = []
+
+    reply = agent.run("Check status.", activity_callback=events.append)
+
+    assert reply == "Done."
+    assert events == [
+        THINKING_STARTED,
+        THINKING_FINISHED,
+        THINKING_STARTED,
+        THINKING_FINISHED,
+    ]
+
+
 def test_agent_returns_command_errors_to_model_for_recovery() -> None:
     model = ScriptedModel(
         [
@@ -343,6 +418,45 @@ def test_interactive_new_command_resets_history_and_session() -> None:
     ]
 
 
+def test_interactive_session_prints_approval_wait_progress() -> None:
+    model = ScriptedModel(
+        [
+            ModelTurn(
+                tool_calls=(
+                    ToolCall(
+                        id="call-1",
+                        name="run_cli_command",
+                        arguments={"command": ["demo-cli", "chat"]},
+                    ),
+                )
+            ),
+            ModelTurn(text="The request is still pending approval."),
+        ]
+    )
+    runner = FakeRunner(
+        [_completed("Approval not completed within the wait window.")],
+        stream_chunks=[("stdout", "Awaiting human approval\n")],
+    )
+    agent = MinimalCliAgent(
+        model=model,
+        cli=CliCommandTool(allowed_commands=("demo-cli",), runner=runner),
+    )
+    output = StringIO()
+
+    status = _run_interactive(
+        agent,
+        input_stream=StringIO("send money\n/quit\n"),
+        output_stream=output,
+        error_stream=StringIO(),
+    )
+
+    transcript = output.getvalue()
+    progress_index = transcript.index("waiting for human approval")
+    final_index = transcript.index("The request is still pending approval.")
+    assert status == 0
+    assert progress_index < final_index
+
+
 def test_build_agent_uses_default_openai_model(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -353,7 +467,7 @@ def test_build_agent_uses_default_openai_model(
 
     assert isinstance(agent.model, OpenAIResponsesModelClient)
     assert agent.model.model == DEFAULT_OPENAI_MODEL
-    assert DEFAULT_OPENAI_MODEL == "gpt-5.4"
+    assert DEFAULT_OPENAI_MODEL == "gpt-5.4-mini"
 
 
 def test_build_agent_loads_default_ralio_skill_url(

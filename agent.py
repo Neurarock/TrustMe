@@ -12,12 +12,13 @@ import json
 import os
 import subprocess
 import sys
+import threading
 import urllib.error
 import urllib.parse
 import urllib.request
 import uuid
 from abc import ABC, abstractmethod
-from collections.abc import Mapping, Sequence
+from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, TextIO
@@ -43,6 +44,21 @@ DEFAULT_SKILL_URL_TIMEOUT_SECONDS = 10
 DEFAULT_MAX_SKILL_CHARS = 200_000
 MAX_COMMAND_TIMEOUT_SECONDS = 600
 TRUNCATION_MARKER = "\n[output truncated]"
+APPROVAL_PROGRESS_MESSAGE = (
+    "Status: request submitted and waiting for human approval. "
+    "I'll keep waiting for the CLI result."
+)
+APPROVAL_WAIT_MARKERS = (
+    "approval is required",
+    "approval required",
+    "awaiting approval",
+    "awaiting human approval",
+    "pending approval",
+    "pending human approval",
+    "requires approval",
+    "waiting for approval",
+    "waiting for human approval",
+)
 COMMAND_ENV_ALLOWLIST = (
     "HOME",
     "LANG",
@@ -58,6 +74,11 @@ COMMAND_ENV_ALLOWLIST = (
     "TEMP",
     "USER",
 )
+CommandOutputCallback = Callable[[str, str], None]
+ProgressCallback = Callable[[str], None]
+ActivityCallback = Callable[[str], None]
+THINKING_STARTED = "thinking_started"
+THINKING_FINISHED = "thinking_finished"
 
 
 @dataclass(frozen=True)
@@ -101,12 +122,13 @@ class CommandRunner(ABC):
         *,
         env: Mapping[str, str],
         timeout_seconds: int,
+        output_callback: CommandOutputCallback | None = None,
     ) -> subprocess.CompletedProcess[str]:
         """Run *command* and return the completed process."""
 
 
 class SubprocessCommandRunner(CommandRunner):
-    """Command runner backed by ``subprocess.run`` without a shell."""
+    """Command runner backed by ``subprocess.Popen`` without a shell."""
 
     def run(
         self,
@@ -114,15 +136,75 @@ class SubprocessCommandRunner(CommandRunner):
         *,
         env: Mapping[str, str],
         timeout_seconds: int,
+        output_callback: CommandOutputCallback | None = None,
     ) -> subprocess.CompletedProcess[str]:
-        return subprocess.run(
+        process = subprocess.Popen(
             command,
             env=dict(env),
             text=True,
-            capture_output=True,
-            timeout=timeout_seconds,
-            check=False,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            bufsize=1,
         )
+        if process.stdout is None or process.stderr is None:
+            raise RuntimeError("Subprocess pipes were not created.")
+
+        stdout_chunks: list[str] = []
+        stderr_chunks: list[str] = []
+        threads = (
+            threading.Thread(
+                target=self._collect_output,
+                args=("stdout", process.stdout, stdout_chunks, output_callback),
+                daemon=True,
+            ),
+            threading.Thread(
+                target=self._collect_output,
+                args=("stderr", process.stderr, stderr_chunks, output_callback),
+                daemon=True,
+            ),
+        )
+
+        for thread in threads:
+            thread.start()
+
+        try:
+            returncode = process.wait(timeout=timeout_seconds)
+        except subprocess.TimeoutExpired as exc:
+            process.kill()
+            process.wait()
+            for thread in threads:
+                thread.join()
+            raise subprocess.TimeoutExpired(
+                command,
+                timeout_seconds,
+                output="".join(stdout_chunks),
+                stderr="".join(stderr_chunks),
+            ) from exc
+
+        for thread in threads:
+            thread.join()
+
+        return subprocess.CompletedProcess(
+            args=command,
+            returncode=returncode,
+            stdout="".join(stdout_chunks),
+            stderr="".join(stderr_chunks),
+        )
+
+    @staticmethod
+    def _collect_output(
+        stream_name: str,
+        stream: TextIO,
+        chunks: list[str],
+        output_callback: CommandOutputCallback | None,
+    ) -> None:
+        try:
+            for chunk in iter(lambda: stream.read(1), ""):
+                chunks.append(chunk)
+                if output_callback is not None:
+                    output_callback(stream_name, chunk)
+        finally:
+            stream.close()
 
 
 @dataclass(frozen=True)
@@ -150,6 +232,7 @@ class CliCommandTool:
         self,
         command: Sequence[str],
         timeout_seconds: int | None = None,
+        progress_callback: ProgressCallback | None = None,
     ) -> CliCommandResult:
         """Run one allowed command and return captured stdout/stderr."""
         normalized = self._normalize_command(command)
@@ -161,12 +244,14 @@ class CliCommandTool:
             )
 
         resolved_timeout = self._resolve_timeout(timeout_seconds)
+        output_callback = _approval_wait_output_callback(progress_callback)
 
         try:
             completed = self.runner.run(
                 normalized,
                 env=_command_environment(),
                 timeout_seconds=resolved_timeout,
+                output_callback=output_callback,
             )
         except FileNotFoundError as exc:
             raise CommandError(
@@ -222,6 +307,35 @@ class CliCommandTool:
                 f"{MAX_COMMAND_TIMEOUT_SECONDS} seconds."
             )
         return resolved_timeout
+
+
+def _approval_wait_output_callback(
+    progress_callback: ProgressCallback | None,
+) -> CommandOutputCallback | None:
+    """Return an output observer that reports approval waits once per command."""
+    if progress_callback is None:
+        return None
+
+    notified = False
+    recent_output = ""
+
+    def observe(_stream_name: str, chunk: str) -> None:
+        nonlocal notified, recent_output
+        if notified:
+            return
+        recent_output = (recent_output + chunk)[-1_000:]
+        if not _looks_like_approval_wait(recent_output):
+            return
+        notified = True
+        progress_callback(APPROVAL_PROGRESS_MESSAGE)
+
+    return observe
+
+
+def _looks_like_approval_wait(text: str) -> bool:
+    """Return true when CLI output indicates a pending approval wait."""
+    normalized = text.lower().replace("_", " ").replace("-", " ")
+    return any(marker in normalized for marker in APPROVAL_WAIT_MARKERS)
 
 
 def _truncate_text(text: str, max_chars: int) -> tuple[str, bool]:
@@ -371,7 +485,7 @@ command or skill is not available, say exactly what is missing.
 """
 
 
-DEFAULT_OPENAI_MODEL = "gpt-5.4"
+DEFAULT_OPENAI_MODEL = "gpt-5.4-mini"
 
 
 @dataclass(frozen=True)
@@ -406,7 +520,13 @@ class MinimalCliAgent:
         self.messages = []
         self.session_id = str(uuid.uuid4())
 
-    def run(self, user_request: str) -> str:
+    def run(
+        self,
+        user_request: str,
+        *,
+        progress_callback: ProgressCallback | None = None,
+        activity_callback: ActivityCallback | None = None,
+    ) -> str:
         """Run the agent until it returns a final answer."""
         if not user_request.strip():
             raise AgentError("Empty user request.")
@@ -415,11 +535,17 @@ class MinimalCliAgent:
         tools = [cli_command_tool_schema(self.cli.allowed_commands)]
 
         for _round_num in range(self.config.max_tool_rounds):
-            turn = self.model.respond(
-                instructions=self._instructions(),
-                messages=self.messages,
-                tools=tools,
-            )
+            if activity_callback is not None:
+                activity_callback(THINKING_STARTED)
+            try:
+                turn = self.model.respond(
+                    instructions=self._instructions(),
+                    messages=self.messages,
+                    tools=tools,
+                )
+            finally:
+                if activity_callback is not None:
+                    activity_callback(THINKING_FINISHED)
 
             if turn.text:
                 self.messages.append({"role": "assistant", "content": turn.text})
@@ -438,7 +564,10 @@ class MinimalCliAgent:
                         "arguments": json.dumps(call.arguments),
                     }
                 )
-                output = self._execute_tool_call(call)
+                output = self._execute_tool_call(
+                    call,
+                    progress_callback=progress_callback,
+                )
                 self.messages.append(
                     {
                         "type": "function_call_output",
@@ -468,7 +597,12 @@ class MinimalCliAgent:
             parts.append("Supplied skill instructions:\n\n" + skill_block)
         return "\n\n".join(parts)
 
-    def _execute_tool_call(self, call: ToolCall) -> dict[str, Any]:
+    def _execute_tool_call(
+        self,
+        call: ToolCall,
+        *,
+        progress_callback: ProgressCallback | None = None,
+    ) -> dict[str, Any]:
         """Execute one supported tool call and return JSON-serializable output."""
         if call.name != "run_cli_command":
             raise ModelError(f"Unknown tool requested by model: {call.name}")
@@ -484,7 +618,11 @@ class MinimalCliAgent:
             return {"error": "run_cli_command `timeout_seconds` must be an integer."}
 
         try:
-            result = self.cli.run(command, timeout_seconds=timeout_seconds)
+            result = self.cli.run(
+                command,
+                timeout_seconds=timeout_seconds,
+                progress_callback=progress_callback,
+            )
         except CommandError as exc:
             return {"error": str(exc)}
 
@@ -742,6 +880,8 @@ def _run_interactive(
             "/new for a fresh session, /id for the session id.\n"
         )
         output_stream.flush()
+    progress_callback = _progress_writer(output_stream)
+    activity_callback = _activity_indicator(output_stream)
 
     while True:
         try:
@@ -774,11 +914,99 @@ def _run_interactive(
             continue
 
         try:
-            output_stream.write(agent.run(user_request) + "\n")
+            output_stream.write(
+                agent.run(
+                    user_request,
+                    progress_callback=progress_callback,
+                    activity_callback=activity_callback,
+                )
+                + "\n"
+            )
             output_stream.flush()
         except AgentError as exc:
             error_stream.write(f"Error: {exc}\n")
             error_stream.flush()
+
+
+def _progress_writer(output_stream: TextIO) -> ProgressCallback:
+    """Return a callback that prints progress updates immediately."""
+
+    def write_progress(message: str) -> None:
+        output_stream.write(message.rstrip() + "\n")
+        output_stream.flush()
+
+    return write_progress
+
+
+class _TerminalActivityIndicator:
+    """Terminal spinner for blocking model calls."""
+
+    _FRAMES = ("-", "\\", "|", "/")
+
+    def __init__(
+        self,
+        output_stream: TextIO,
+        *,
+        enabled: bool,
+        label: str = "Thinking",
+        interval_seconds: float = 0.1,
+    ) -> None:
+        self.output_stream = output_stream
+        self.enabled = enabled
+        self.label = label
+        self.interval_seconds = interval_seconds
+        self._stop_event = threading.Event()
+        self._thread: threading.Thread | None = None
+        self._lock = threading.Lock()
+
+    def __call__(self, event: str) -> None:
+        if event == THINKING_STARTED:
+            self.start()
+        elif event == THINKING_FINISHED:
+            self.stop()
+
+    def start(self) -> None:
+        if not self.enabled:
+            return
+        with self._lock:
+            if self._thread is not None and self._thread.is_alive():
+                return
+            self._stop_event.clear()
+            self._thread = threading.Thread(target=self._run, daemon=True)
+            self._thread.start()
+
+    def stop(self) -> None:
+        if not self.enabled:
+            return
+        with self._lock:
+            thread = self._thread
+            if thread is None:
+                return
+            self._stop_event.set()
+
+        thread.join()
+
+        with self._lock:
+            if self._thread is thread:
+                self._thread = None
+        self.output_stream.write("\r\033[2K")
+        self.output_stream.flush()
+
+    def _run(self) -> None:
+        frame_index = 0
+        while not self._stop_event.is_set():
+            frame = self._FRAMES[frame_index % len(self._FRAMES)]
+            self.output_stream.write(f"\r{self.label} {frame}")
+            self.output_stream.flush()
+            frame_index += 1
+            self._stop_event.wait(self.interval_seconds)
+
+
+def _activity_indicator(output_stream: TextIO) -> ActivityCallback:
+    return _TerminalActivityIndicator(
+        output_stream,
+        enabled=bool(getattr(output_stream, "isatty", lambda: False)()),
+    )
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -799,7 +1027,16 @@ def main(argv: list[str] | None = None) -> int:
             )
             return 1
         if instruction is not None:
-            print(agent.run(instruction))
+            progress_callback = (
+                _progress_writer(sys.stdout) if sys.stdout.isatty() else None
+            )
+            print(
+                agent.run(
+                    instruction,
+                    progress_callback=progress_callback,
+                    activity_callback=_activity_indicator(sys.stdout),
+                )
+            )
     except AgentError as exc:
         print(f"Error: {exc}", file=sys.stderr)
         if not should_open_repl:
