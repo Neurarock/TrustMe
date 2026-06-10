@@ -1,0 +1,4 @@
+supplier_id,name,approved,ralio_recipient_id,expected_category
+sup_northstar,Northstar Design,true,acc_sandbox_northstar,design
+sup_zenith,Zenith Print,false,acc_sandbox_zenith,printing
+

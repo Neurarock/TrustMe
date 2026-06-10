@@ -1,78 +1,107 @@
-# Ralio Client Agent
+# TrustMe Ralio Backend
 
-This repository is a reference implementation for a client agent that connects
-to a Ralio Agent through the Ralio CLI.
+This repository now contains TrustMe, a multi-agent finance operations backend
+for money-out requests. TrustMe investigates and decides whether money should
+move; Ralio safely moves approved money.
 
-It keeps the agent loop deliberately small so implementers can focus on how a
-CLI-capable client agent interacts with Ralio, instead of rebuilding an agent
-loop from scratch.
+The original Ralio CLI sample remains in `agent.py` as a reference client. The
+TrustMe backend lives under `backend/app` and uses FastAPI, PydanticAI, SQLite,
+CSV-backed mock business systems, and a mock/live Ralio adapter.
 
-The Python agent does not import or wrap Ralio SDK, API, or CLI internals. It
-has one generic tool: `run_cli_command`. That tool executes allowed CLI commands
-as argv arrays without a shell. When `ralio` is allowed, the agent automatically
-loads the hosted Ralio CLI skill from
-[`https://console.ralio.co/skill.md`](https://console.ralio.co/skill.md).
+## TrustMe Quickstart
 
-## Status
-
-This is a reference implementation, not production infrastructure. It is
-intended to be small, inspectable, and easy to adapt when building a client
-agent that connects to Ralio through the CLI.
-
-## Prerequisites
-
-- Python 3.11 or newer.
-- An OpenAI API key for the model client.
-- The Ralio CLI installed and available on `PATH`.
-- Access to a Ralio Agent. For machine callers, this usually means a
-  `ralio-reg-...` registration ticket for `ralio auth agent`.
-
-## Setup
-
-From the repo root:
+The simplest path is the Taskfile:
 
 ```bash
-python -m venv .venv
-source .venv/bin/activate
-python -m pip install -r requirements.txt
+cp .env.example .env
+task install
+task dev
 ```
 
-For development with the locked dependency set, you can use `uv` instead:
+Open the REST docs at `http://127.0.0.1:8000/docs`.
+
+Run the same backend in Docker:
 
 ```bash
-uv sync --dev
+cp .env.example .env
+task up
 ```
 
-After `uv sync`, run commands with `uv run` or activate the generated `.venv`.
+Default mode is `RALIO_MODE=mock`, so the seeded demo can run without Ralio
+credentials. For live Ralio, create and register a Ralio credential binding,
+set `RALIO_MODE=live` and `RALIO_AGENT_ID`, then keep Ralio credentials in the
+host-level `~/.ralio` store. The live adapter lazy-loads Ralio's Python SDK
+because the documented `pip install ralio` package is not currently available
+on the public PyPI index.
 
-To install the Ralio CLI, use Homebrew on macOS arm64 or Linux x86_64:
+Useful tasks:
+
+```bash
+task verify        # ruff + pytest
+task smoke         # checks a running API
+task demo          # runs the four-request demo flow against a running API
+task mcp           # starts the TrustMe MCP server
+task ralio:doctor  # checks live Ralio prerequisites
+```
+
+`task demo` runs real PydanticAI/OpenAI investigations, so `OPENAI_API_KEY`
+must be set in `.env`. The tests use scripted PydanticAI `FunctionModel`
+clients and never call OpenAI or Ralio.
+
+To register a live Ralio host, install the CLI first:
 
 ```bash
 brew install ralioco/tap/ralio
 ```
 
-Or use the install script:
+Then set `RALIO_REGISTRATION_TICKET` in `.env` and run:
 
 ```bash
-curl -fsSL https://releases.ralio.co/install.sh | bash
+task ralio:register
 ```
 
-The install script auto-detects macOS arm64 or Linux x64 and installs the
-`ralio` binary to `/usr/local/bin`.
+Ralio writes the private key under `~/.ralio`; do not copy that directory into
+the repository. Registration tickets are one-time credentials with a short TTL;
+if Ralio returns `ticket_expired`, generate a new ticket in
+Console → Settings → Credentials and rerun `task ralio:register`.
 
-Authenticate the Ralio CLI:
+## Core Flow
+
+1. `POST /api/requests` creates a money-out request.
+2. `POST /api/requests/{id}/investigate` runs the PydanticAI orchestrator,
+   specialist agent, and risk agent.
+3. `POST /api/requests/{id}/approve` grants TrustMe approval when required.
+4. `POST /api/requests/{id}/execute` validates the final decision and calls the
+   Ralio adapter.
+5. `GET /api/requests/{id}/audit` shows the audit trail.
+
+## Demo Requests
+
+On first startup, TrustMe seeds four demo requests:
+
+- Sarah reimbursement: approved and paid in mock mode.
+- Northstar invoice: needs TrustMe approval before execution.
+- BrightPath refund: approved and paid in mock mode.
+- Duplicate Sarah reimbursement: blocked before Ralio is called.
+
+## MCP
+
+TrustMe exposes its own MCP server:
 
 ```bash
-ralio auth agent --ticket ralio-reg-...
-ralio auth status
+task mcp
 ```
 
-Configure local environment variables:
+This is separate from Ralio's MCP Gateway. TrustMe MCP tools call TrustMe
+services and safety gates; live Ralio execution still goes through the Ralio
+REST Chat API via the Ralio Python SDK.
+
+## Original Ralio CLI Sample
+
+The original CLI sample is still available:
 
 ```bash
-cp .env.example .env
-# Edit .env and set OPENAI_API_KEY.
-source .env
+python agent.py --allow-command ralio
 ```
 
 ## Run Interactively

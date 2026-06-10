@@ -1,0 +1,19 @@
+services:
+  trustme:
+    build:
+      context: .
+    env_file:
+      - .env
+    environment:
+      TRUSTME_DATA_DIR: /app/backend/app/data
+      TRUSTME_SQLITE_PATH: /app/var/trustme.sqlite3
+      TRUSTME_SEED_DEMO_DATA: ${TRUSTME_SEED_DEMO_DATA:-true}
+      RALIO_MODE: ${RALIO_MODE:-mock}
+      RALIO_API_URL: ${RALIO_API_URL:-https://api.ralio.co}
+    ports:
+      - "${TRUSTME_PORT:-8000}:8000"
+    volumes:
+      - trustme-data:/app/var
+
+volumes:
+  trustme-data:

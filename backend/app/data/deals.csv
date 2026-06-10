@@ -1,0 +1,3 @@
+deal_id,partner_id,customer_id,value,currency,status
+D-102,partner_alex,cus_acme,1000.00,GBP,closed_won
+

@@ -1,7 +1,7 @@
 [project]
-name = "ralio-client-agent"
+name = "trustme-ralio-backend"
 version = "0.1.0"
-description = "Reference implementation for a client agent that connects to a Ralio Agent through the Ralio CLI."
+description = "TrustMe multi-agent finance operations backend using PydanticAI and Ralio."
 readme = "README.md"
 license = "MIT"
 requires-python = ">=3.11"
@@ -10,9 +10,10 @@ authors = [
 ]
 keywords = [
     "agent",
-    "cli",
+    "finance",
+    "fastapi",
+    "pydantic-ai",
     "ralio",
-    "reference-implementation",
 ]
 classifiers = [
     "Development Status :: 3 - Alpha",
@@ -22,7 +23,13 @@ classifiers = [
     "Programming Language :: Python :: 3.12",
 ]
 dependencies = [
+    "fastapi>=0.115",
+    "httpx>=0.27",
+    "mcp>=1.12",
     "openai>=1.30",
+    "pydantic-ai-slim[openai]>=1.0",
+    "pydantic-settings>=2.0",
+    "uvicorn>=0.30",
 ]
 
 [project.urls]

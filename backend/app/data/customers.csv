@@ -1,0 +1,4 @@
+customer_id,name,status,ralio_recipient_id
+cus_brightpath,BrightPath,active,acc_sandbox_brightpath
+cus_acme,Acme,active,acc_sandbox_acme
+

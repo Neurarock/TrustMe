@@ -1,0 +1,4 @@
+employee_id,name,active,manager,reimbursement_auto_threshold
+emp_sarah,Sarah Jones,true,Moira Lane,100.00
+emp_alex,Alex Patel,true,Nina Shah,100.00
+

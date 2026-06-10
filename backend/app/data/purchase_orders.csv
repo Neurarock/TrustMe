@@ -1,0 +1,3 @@
+po_number,supplier_id,amount,currency,status
+PO-9002,sup_northstar,420.00,GBP,approved
+

@@ -1,0 +1,4 @@
+invoice_id,invoice_number,entity_type,entity_id,amount,currency,paid_status,po_number,support_ticket_id,overbilled_amount
+inv_supplier_2042,INV-2042,supplier,sup_northstar,420.00,GBP,unpaid,PO-9002,,
+inv_customer_bp_100,BP-100,customer,cus_brightpath,1040.00,GBP,paid,,T-88,260.00
+

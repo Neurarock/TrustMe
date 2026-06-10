@@ -1,0 +1,105 @@
+version: '3'
+
+vars:
+  UV_CACHE_DIR: .uv-cache
+  HOST: '{{default "127.0.0.1" .TRUSTME_HOST}}'
+  PORT: '{{default "8000" .TRUSTME_PORT}}'
+  BASE_URL: 'http://{{.HOST}}:{{.PORT}}'
+
+tasks:
+  default:
+    desc: Show available tasks.
+    cmds:
+      - task --list
+
+  env:init:
+    desc: Create .env from .env.example if it does not exist.
+    cmds:
+      - test -f .env || cp .env.example .env
+
+  install:
+    desc: Install local development dependencies with uv.
+    cmds:
+      - UV_CACHE_DIR={{.UV_CACHE_DIR}} uv sync --dev
+
+  lint:
+    desc: Run Ruff.
+    cmds:
+      - UV_CACHE_DIR={{.UV_CACHE_DIR}} uv run ruff check
+
+  test:
+    desc: Run the deterministic test suite.
+    cmds:
+      - UV_CACHE_DIR={{.UV_CACHE_DIR}} uv run pytest
+
+  verify:
+    desc: Run lint and tests.
+    deps:
+      - lint
+      - test
+
+  dev:
+    desc: Run the FastAPI backend locally.
+    cmds:
+      - UV_CACHE_DIR={{.UV_CACHE_DIR}} uv run uvicorn backend.app.main:app --host {{.HOST}} --port {{.PORT}}
+
+  dev:reload:
+    desc: Run the FastAPI backend locally with uvicorn reload.
+    cmds:
+      - UV_CACHE_DIR={{.UV_CACHE_DIR}} uv run uvicorn backend.app.main:app --host {{.HOST}} --port {{.PORT}} --reload
+
+  mcp:
+    desc: Run the TrustMe MCP server.
+    cmds:
+      - UV_CACHE_DIR={{.UV_CACHE_DIR}} uv run python -m backend.app.mcp_server
+
+  smoke:
+    desc: Check a running API server.
+    cmds:
+      - UV_CACHE_DIR={{.UV_CACHE_DIR}} uv run python scripts/smoke_api.py --base-url {{.BASE_URL}}
+
+  demo:
+    desc: Run the API demo acceptance flow against a running server.
+    cmds:
+      - UV_CACHE_DIR={{.UV_CACHE_DIR}} uv run python scripts/demo_acceptance.py --base-url {{.BASE_URL}}
+
+  docker:build:
+    desc: Build the TrustMe Docker image.
+    deps:
+      - env:init
+    cmds:
+      - docker compose build
+
+  docker:up:
+    desc: Run TrustMe through Docker Compose.
+    deps:
+      - env:init
+    cmds:
+      - docker compose up --build
+
+  docker:down:
+    desc: Stop the Docker Compose stack.
+    cmds:
+      - docker compose down
+
+  up:
+    desc: Alias for docker:up.
+    cmds:
+      - task docker:up
+
+  run:
+    desc: Alias for docker:up.
+    cmds:
+      - task docker:up
+
+  ralio:doctor:
+    desc: Check local Ralio live-mode prerequisites.
+    cmds:
+      - UV_CACHE_DIR={{.UV_CACHE_DIR}} uv run python scripts/ralio_doctor.py
+
+  ralio:register:
+    desc: Register this host with Ralio using RALIO_REGISTRATION_TICKET.
+    cmds:
+      - 'set -a; test -f .env && . ./.env; set +a; test -n "$RALIO_REGISTRATION_TICKET" || (echo "Set RALIO_REGISTRATION_TICKET in .env first." && exit 1)'
+      - 'command -v ralio >/dev/null || (echo "Ralio CLI is not installed. Install it with: brew install ralioco/tap/ralio" && exit 1)'
+      - 'set -a; . ./.env; set +a; ralio auth agent --ticket "$RALIO_REGISTRATION_TICKET"'
