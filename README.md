@@ -1,3 +1,27 @@
+# TrustMe - Revenue Operations for Lean Teams
+## Antler Deployed Hack Ralio Track
+### Just because AI agents can submit payment requests now doesn't mean they should!
+## Problem:
+In every company, money goes out for many different reasons: employee reimbursements, supplier invoices, customer refunds, partner commissions, goodwill credits, and one-off operational payments.
+The problem is that each of these requests looks simple on the surface, but behind every payment there is a mini investigation.
+A FinOps person has to ask: Who is requesting this? Is the payee real? Is there a receipt or invoice? Is the supplier approved? Does this match a customer, contract, purchase order, support ticket, or previous payment? Is this a duplicate? Does policy allow it? Does it need approval? And finally, is it safe to move the money?
+Today, that context is scattered across Slack, email, spreadsheets, CRM, accounting tools, support tickets, HR systems, and payment platforms. So finance teams waste time chasing context, approvals are slow, duplicate payments slip through, customer refunds get missed, and audit trails are weak.
+## Solution:
+Instead of asking one generic AI agent to handle everything, we use a team of specialist ReAct agents.
+An Orchestrator Agent receives the request, understands what kind of money-out workflow it is, and routes it to the right specialist agent.
+The Reimbursement Agent handles employee claims.
+The Supplier Invoice Agent handles vendor invoices.
+The Customer Refund Agent handles overbilling, SLA credits, and goodwill refunds.
+The Partner Commission Agent handles referral or affiliate payouts.
+And the Risk & Duplicate Agent runs across every request to detect duplicate claims, policy violations, suspicious changes, or payments that should be escalated.
+These agents do not just guess. They reason step by step. Each agent follows a ReAct loop: it thinks about what it needs to know, calls tools, observes the result, updates its reasoning, and then decides whether to approve, block, or request human approval.
+## Thought Process Example
+If Sarah submits a £38.40 client lunch reimbursement, the Reimbursement Agent checks the employee record, receipt, policy, amount threshold, and previous payments. If everything passes, it approves the request.
+If Northstar sends a supplier invoice, the Supplier Invoice Agent checks whether the supplier exists, whether the invoice was already paid, whether the amount matches expectations, and whether approval is needed.
+If BrightPath was overbilled, the Customer Refund Agent checks the customer record, invoice, support ticket, and payment history, then calculates the refund amount.
+TrustMe is the business reasoning layer. It decides whether money should move.
+Ralio is the safe payment execution layer. Once TrustMe approves a request, Ralio handles payment execution, spend limits, approvals, status updates, and auditability.
+### TrustMe investigates why money should move. Ralio makes sure it moves safely.
 # TrustMe Ralio Backend
 
 This repository now contains TrustMe, a multi-agent finance operations backend
