@@ -37,6 +37,22 @@ def create_app() -> FastAPI:
     def health() -> dict[str, str]:
         return {"status": "ok"}
 
+    @app.post("/api/admin/reset")
+    def reset_db() -> dict[str, str]:
+        from backend.app.container import get_service
+        service = get_service()
+        with service.repository._connect() as conn:
+            conn.executescript("""
+                DROP TABLE IF EXISTS requests;
+                DROP TABLE IF EXISTS decisions;
+                DROP TABLE IF EXISTS audit_events;
+                DROP TABLE IF EXISTS payments;
+                DROP TABLE IF EXISTS approvals;
+            """)
+        service.repository._init_schema()
+        service.seed_demo_requests()
+        return {"status": "ok"}
+
     return app
 
 

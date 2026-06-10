@@ -1,3 +1,4 @@
 receipt_id,employee_id,amount,currency,category,merchant,date
 rcpt_sarah_lunch,emp_sarah,38.40,GBP,client_lunch,Acme,2026-06-09
 
+rcpt_alex_lunch,emp_alex,45.50,GBP,client_lunch,GlobalTech,2026-06-09

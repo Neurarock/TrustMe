@@ -46,6 +46,7 @@ def main() -> int:
 
     with httpx.Client(timeout=180) as client:
         client.get(f"{base_url}/health").raise_for_status()
+        client.post(f"{base_url}/api/admin/reset").raise_for_status()
         for case in DEMO_REQUESTS:
             _run_case(client, base_url, case)
 

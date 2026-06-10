@@ -271,10 +271,10 @@ class TrustMeService:
         if self.repository.request_count() > 0:
             return
         cases = [
-            {"title": "Sarah reimbursement", "desc": "Reimburse Sarah £38.40 for client lunch with Acme.", "payee": "Sarah Jones", "amount": 38.40},
+            {"title": "Alex reimbursement", "desc": "Reimburse Alex £45.50 for client lunch with GlobalTech.", "payee": "Alex Patel", "amount": 45.50},
             {"title": "Northstar invoice", "desc": "Pay Northstar Design £420 for invoice INV-2042.", "payee": "Northstar Design", "amount": 420.00},
             {"title": "BrightPath refund", "desc": "Refund BrightPath £260 because we overbilled them.", "payee": "BrightPath", "amount": 260.00},
-            {"title": "Duplicate Sarah reimbursement", "desc": "Reimburse Sarah £38.40 again for the same lunch.", "payee": "Sarah Jones", "amount": 38.40},
+            {"title": "Duplicate Alex reimbursement", "desc": "Reimburse Alex £45.50 again for the same lunch.", "payee": "Alex Patel", "amount": 45.50},
         ]
         from decimal import Decimal
         for case in cases:
