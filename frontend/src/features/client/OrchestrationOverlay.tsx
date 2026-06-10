@@ -55,13 +55,13 @@ export function OrchestrationOverlay({
   outcome?: RequestDecision;
   onDone: () => void;
 }) {
-  const specialist = DEFAULT_AGENT_FOR_TYPE[type];
+  const specialist = DEFAULT_AGENT_FOR_TYPE[type] || "reimbursement_agent";
   const verdict = verdictOf(outcome);
 
   const stages: { agent: AgentType; line: string }[] = [
     { agent: "orchestrator", line: "Reading and classifying your request…" },
-    { agent: "orchestrator", line: `Classified as ${REQUEST_TYPE_LABELS[type].toLowerCase()}` },
-    { agent: specialist, line: `Dispatching to the ${AGENT_LABELS[specialist]}` },
+    { agent: "orchestrator", line: `Classified as ${(REQUEST_TYPE_LABELS[type] || type || "request").toLowerCase()}` },
+    { agent: specialist, line: `Dispatching to the ${AGENT_LABELS[specialist] || "Specialist"}` },
     { agent: "risk_duplicate_agent", line: "Risk & Duplicate Agent screening for problems…" },
   ];
 

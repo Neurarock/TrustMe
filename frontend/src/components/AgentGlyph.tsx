@@ -41,18 +41,21 @@ export function AgentGlyph({
   size?: "sm" | "md" | "lg";
   className?: string;
 }) {
-  const Icon = AGENT_ICON[agent];
+  const Icon = AGENT_ICON[agent] || Brain;
   const box = size === "lg" ? "size-10" : size === "sm" ? "size-7" : "size-9";
   const icon = size === "lg" ? "size-5" : size === "sm" ? "size-3.5" : "size-4";
+  const accent = AGENT_ACCENT[agent] || "bg-slate-50 text-slate-600 ring-slate-600/15";
+  const label = AGENT_LABELS[agent] || "Unknown Agent";
+
   return (
     <span
       className={cn(
         "grid shrink-0 place-items-center rounded-lg ring-1 ring-inset",
         box,
-        AGENT_ACCENT[agent],
+        accent,
         className,
       )}
-      title={AGENT_LABELS[agent]}
+      title={label}
     >
       <Icon className={icon} />
     </span>
@@ -60,10 +63,11 @@ export function AgentGlyph({
 }
 
 export function AgentTag({ agent }: { agent: AgentType }) {
+  const label = AGENT_LABELS[agent] || "Unknown Agent";
   return (
     <span className="inline-flex items-center gap-2 text-sm text-slate-700">
       <AgentGlyph agent={agent} size="sm" />
-      {AGENT_LABELS[agent]}
+      {label}
     </span>
   );
 }

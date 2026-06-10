@@ -68,7 +68,7 @@ export function ReActTimeline({ steps }: { steps: ReActStep[] }) {
                   {step.tool}
                 </code>
               )}
-              <p className="mt-1 text-[11px] text-slate-400 dark:text-slate-500">{AGENT_LABELS[step.agent]}</p>
+              <p className="mt-1 text-[11px] text-slate-400 dark:text-slate-500">{AGENT_LABELS[step.agent] || step.agent || "Unknown Agent"}</p>
             </div>
           </motion.li>
         );
