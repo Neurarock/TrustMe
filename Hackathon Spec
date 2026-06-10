@@ -1,0 +1,394 @@
+This is for a Antler Deploy 
+
+We need:
+Hackathon Business
+Application
+Would a real business
+actually use this?
+Agent Reasoning
+Does the agent make a
+non-trivial decision, not just
+execute a Pay button?
+Creativity &
+Innovation
+Does the idea surprise us? is the criteria.
+
+We want to create a Ralio multu-Agent workflow for RevOps.
+
+We’re building TrustMe, a multi-agent finance operations platform on top of Ralio.
+Most companies have a messy “money-out” problem. Money leaves the business for many reasons: employee reimbursements, supplier invoices, customer refunds, partner commissions, goodwill credits, and one-off operational payments. But these requests usually arrive through Slack, email, spreadsheets, accounting tools, CRM notes, and support tickets. The result is slow approvals, duplicate payments, missed reimbursements, unclear ownership, and poor audit trails.
+TrustMe gives the company one intelligent Money-Out Command Centre.
+A user can create or upload a payment request, such as: “Reimburse Sarah £38.40 for a client lunch”, “Pay Northstar Design £420 for invoice INV-2042”, or “Refund BrightPath £260 because we overbilled them”. TrustMe then uses a team of specialist agents to investigate the request, decide whether money should move, and send approved payments to Ralio for safe execution.
+The first agent is the Orchestrator Agent. Its job is to understand the request and route it to the right specialist. It classifies the request as an employee reimbursement, supplier invoice, customer refund, partner commission, or risky/duplicate case.
+Then we have specialist agents.
+The Reimbursement Agent handles internal employee expenses. It checks whether the employee exists, whether a receipt is attached, whether the category is allowed, whether the amount is under the auto-approval threshold, and whether this expense has already been claimed.
+The Supplier Invoice Agent handles vendor invoices. It checks whether the supplier is known, whether the invoice number already exists, whether the amount matches a purchase order or expected service, and whether approval is required before payment.
+The Customer Refund Agent handles revenue-side reimbursements: overbilling, SLA credits, campaign under-delivery, duplicate charges, or goodwill refunds. It checks the customer record, invoice, contract terms, support ticket, previous payments, and calculates the refund amount.
+The Partner Commission Agent handles referral, affiliate, or partner payouts. It checks whether the deal closed, whether the commission terms apply, whether the payout amount is correct, and whether it has already been paid.
+Finally, the Risk and Duplicate Agent runs across every request. It looks for duplicate receipts, duplicate invoices, repeated payment attempts, suspicious recipient changes, policy violations, and cases that require manual approval.
+The important technical point is that these are ReAct agents. They do not just produce a final answer from one prompt. Each agent follows a reasoning loop: it thinks about what it needs to know, calls tools, observes the result, updates its reasoning, and then decides the next action. For example, the Supplier Invoice Agent might first inspect the invoice, then call a supplier lookup tool, then check previous payments, then check policy, then decide whether to approve, block, or escalate.
+The UI is designed like a modern finance operations cockpit. The main screen is a Money-Out Inbox showing every request, its type, amount, assigned agent, risk level, decision, and Ralio payment status. A finance or ops user can click into any case and see the full reasoning trail: what the agent checked, which tools it called, which policy rules passed or failed, and why the final decision was made.
+Each case detail page has four sections: the original request, the agent investigation, the policy and risk checks, and the Ralio execution panel. If a request is approved, TrustMe sends it to Ralio. If it needs approval, it waits. If it is a duplicate or risky, it is blocked before money moves.
+Ralio is the payment execution layer. TrustMe decides whether a payment should happen; Ralio handles the safe movement of money with controls, approvals, status updates, and auditability.
+The demo shows four outcomes from one inbox: an employee reimbursement that gets approved and paid, a supplier invoice that requires approval, a customer refund that is calculated and paid, and a duplicate request that is blocked.
+So the core idea is simple:
+TrustMe is the business brain for money-out operations. It investigates why money should move, and Ralio safely moves it.
+
+Introduction
+Ralio
+Ralio lets you create AI agents that perform banking operations on your behalf. Each agent operates within guardrails you define: spend limits, tool permissions, and human-in-the-loop approvals. You interact with agents via a web console, CLI, REST API or MCP Gateway.
+
+What Ralio Does
+A Ralio agent is a scoped payment authority. You create an agent, configure what it can do, connect it to a banking provider, and then direct it in natural language — via chat or programmatic access. The agent executes banking operations, and Ralio enforces your guardrails at every step.
+
+Typical use cases:
+
+An internal payments bot that processes expense reimbursements after human approval
+An automated treasury agent that sweeps balances on a schedule
+A customer-service agent that issues refunds within a daily spend limit
+An AI assistant in your existing app that can make payments via the MCP Gateway
+At a high level, a request flows from any interface to your Ralio agent. The agent operates with scoped authority — bounded by guardrails and approvals, it can only reach payment infrastructure within those limits, and every step is recorded:
+
+Introductions
+
+You /
+your app
+Interfaces
+Console · CLI · REST API · MCP
+Ralio Agent
+Payment
+infrastructure
+Guardrails & approvals · scoped authority
+intent verification · spend limits
+tool permissions · approvals
+Audit log — every step recorded
+Core Concepts
+Agents
+Configurable payment entities with a defined purpose, spend limits, and tool permissions.
+Payment Intents
+Every payment starts as an intent — a recorded request before execution, enabling audit and approval.
+Intent Verification
+A separate model scores each payment intent against the conversation and agent purpose. Low scores pause the payment for human approval.
+Tool Permissions
+Control which banking operations an agent can execute — automatically or with approval.
+Spend Limits
+Hard and soft limits on per-transaction, daily, and monthly spending.
+Approvals
+Real-time human-in-the-loop approval flows for tool calls and spend limit overrides.
+Integration Options
+Interface	Best For
+Web Console	Humans managing agents, configuring guardrails, reviewing transactions
+REST API	Server-side integrations, custom dashboards, programmatic agent management
+CLI (ralio)	Terminal-based chat and automation
+MCP Gateway	AI agents (Claude, GPT, etc.) calling banking tools directly
+Quick Navigation
+Quickstart
+Create your first agent and make a payment in 5 minutes.
+API Reference
+Complete REST API documentation with examples.
+MCP Gateway
+Connect an AI agent to Ralio banking tools.
+CLI
+Terminal-based chat, agent management, and automation.
+Base URLs
+Service	URL
+REST API	https://api.ralio.co
+MCP Gateway	https://mcp.ralio.co
+Console	https://console.ralio.co
+Machine-Readable Specs
+LLMs and tools can consume the full API surface from these files:
+
+OpenAPI 3.1 (JSON): https://docs.ralio.co/openapi.json
+Full docs (plaintext): https://docs.ralio.co/llms-full.txt
+
+Frontend Brief: TrustMe Money-Out Command Centre
+We are building TrustMe, a modern multi-agent finance operations UI on top of a backend that uses specialist ReAct agents and Ralio for payment execution.
+The frontend should feel like a polished fintech/SaaS dashboard: modern, fast, clean, premium, and demo-ready.
+Think: Linear + Ramp + Vercel dashboard, but for agentic payments.
+The core product message:
+TrustMe receives money-out requests, routes them to specialist agents, shows how they reason, and sends approved payments to Ralio.
+What the frontend needs to show
+The UI should make the system feel like a real Money-Out Command Centre.
+Users should be able to:
+See all money-out requests in one inbox.Create a new request.See which agent handled each request.Watch the agent investigation flow.See policy checks and risk checks.See whether the request was approved, blocked, escalated, or paid.Execute approved payments through Ralio.View Ralio payment status and audit history.The most important visual moment is:
+The user clicks into a case and sees the agent reasoning timeline: tool calls, observations, policy checks, risk checks, final decision, then Ralio execution.
+Suggested Stack
+Use whatever is fastest, but preferred:
+React / Next.jsTypeScriptTailwind CSSshadcn/ui or Radix UITanStack Query for API stateFramer Motion for subtle transitionsZustand if local state is neededLucide iconsRecharts only if we add chartsPlease keep the code clean and componentised. Do not hardcode everything inside one page.
+
+Visual Style
+The UI should look modern and slick.
+Style direction
+Dark navy / slate background accentsWhite main cardsSoft shadowsRounded cornersSubtle gradientsClean typographyPlenty of spacingCalm fintech coloursStatus colours
+Approved: greenPaid: blue/greenNeeds approval: amberBlocked: redInvestigating: purple/blueDraft/new: greyImportant design principle
+Do not make it look like an admin CRUD tool. Make it feel like an intelligent operations cockpit.
+
+Main Screens
+1. Dashboard
+Route:
+/Purpose: high-level demo landing page.
+Show metric cards:
+Total requestsApproved todayPaid via RalioNeeds approvalBlocked duplicatesTotal amount processedBelow that, show two panels:
+Panel A: Money-Out Activity
+Recent cases:
+Sarah reimbursement — Approved — £38.40Northstar invoice — Needs approval — £420BrightPath refund — Paid via Ralio — £260Sarah duplicate — Blocked — £38.40Panel B: Agent Performance
+Show specialist agents as cards:
+Orchestrator AgentReimbursement AgentSupplier Invoice AgentCustomer Refund AgentPartner Commission AgentRisk & Duplicate AgentRalio Payment AgentEach card should show:
+Status: onlineCases handledLast activityShort description
+2. Money-Out Inbox
+Route:
+/requestsThis is the main product screen.
+Show a table/list of requests.
+Columns:
+Request titleTypePayeeAmountAssigned agentRisk levelDecisionRalio statusCreated timeExample rows:
+Reimburse Sarah for client lunch
+Type: Employee reimbursement
+Amount: £38.40
+Agent: Reimbursement Agent
+Decision: Approved
+Ralio: Paid
+
+Pay Northstar Design invoice INV-2042
+Type: Supplier invoice
+Amount: £420
+Agent: Supplier Invoice Agent
+Decision: Needs approval
+Ralio: Not sent
+
+Refund BrightPath overbilling
+Type: Customer refund
+Amount: £260
+Agent: Customer Refund Agent
+Decision: Approved
+Ralio: Paid
+
+Duplicate Sarah lunch claim
+Type: Employee reimbursement
+Amount: £38.40
+Agent: Risk & Duplicate Agent
+Decision: Blocked
+Ralio: Not sentAdd filters:
+AllApprovedPaidNeeds approvalBlockedReimbursementsSupplier invoicesCustomer refundsPartner commissionsAdd search by:
+request titlepayeeamountrequest typeagent
+3. Create Request Modal
+Trigger:
+New requestThe modal should let the user create a money-out request.
+Fields:
+• Request type:
+employee reimbursement
+supplier invoice
+customer refund
+partner commission
+• Payee
+• Amount
+• Currency
+• Description
+• Reference ID
+• Optional uploaded file / receipt / invoice
+• Optional customer/supplier/employee/deal reference
+Also include demo presets:
+Sarah lunch reimbursementNorthstar supplier invoiceBrightPath customer refundDuplicate reimbursementThis is important for hackathon reliability. We should be able to create demo cases quickly.
+
+4. Request Detail Page
+Route:
+/requests/:idThis is the most important screen.
+Layout:
+Top summary card
+Left/main: Agent investigation timeline
+Right/sidebar: Decision + Ralio execution panel
+Bottom: Audit log
+Request Detail Components
+A. Header Summary
+Show:
+Request titleType badgeAmountPayeeStatusAssigned agentCreated timeExample:
+Reimburse Sarah for client lunch
+Employee reimbursement · £38.40 · Approved · Reimbursement AgentPrimary buttons:
+InvestigateApproveRejectExecute with RalioRefresh Ralio statusOnly show Execute with Ralio if the backend says ralio_ready: true.
+
+B. Agent Investigation Timeline
+This is the hero component.
+Show each ReAct step visually.
+Example:
+1. Thought
+The request looks like an employee reimbursement. I need to verify employee, receipt, policy, and duplicates.
+
+2. Tool call
+lookup_employee("Sarah Jones")
+
+3. Observation
+Sarah Jones exists. Department: Sales. Manager: Priya Shah.
+
+4. Tool call
+lookup_receipt("receipt_102")
+
+5. Observation
+Receipt found. Merchant: Pret. Amount: £38.40.
+
+6. Tool call
+check_policy("employee_reimbursement", 38.40, "client_meal")
+
+7. Observation
+Policy passed. Auto-approval threshold: £50.
+
+8. Tool call
+lookup_previous_payments("Sarah Jones", 38.40, "client lunch")
+
+9. Observation
+No duplicate payment found.
+
+10. Final decision
+Approved. Ready for Ralio execution.Use icons:
+Brain/ThoughtWrench/Tool callEye/ObservationShield/PolicyCheck/DecisionWarning/RiskBank/PaymentThis should be very visual and satisfying.
+
+C. Policy Checks Panel
+Show checklist cards:
+✓ Employee exists
+✓ Receipt found
+✓ Category allowed
+✓ Amount under auto-approval threshold
+✓ No duplicate found
+✓ Risk agent passedFor blocked case:
+✓ Employee exists
+✓ Receipt found
+✗ Duplicate payment detected
+✗ Ralio execution blocked
+D. Risk Panel
+Show:
+Risk scoreRisk levelDuplicate statusRecipient mismatchApproval neededNotesExample:
+Risk level: Low
+Duplicate detected: No
+Approval required: No
+Payment retry risk: NoFor blocked duplicate:
+Risk level: High
+Duplicate detected: Yes
+Existing payment: RALIO-PAY-1029
+Action: Blocked before Ralio
+E. Decision Card
+Show the final structured decision:
+Decision: Approved
+Confidence: 92%
+Reason:
+Employee exists, receipt found, amount is under policy threshold, and no duplicate payment was found.Possible decisions:
+ApprovedNeeds approvalBlockedNeeds more informationRejectedPaid
+F. Ralio Execution Panel
+This should make Ralio visible.
+Show:
+Ralio mode: mock/liveRalio payment statusRalio reference IDAmountPayeePayment created timeLast status updateButton: Execute with RalioButton: Refresh statusExample:
+Ralio Execution
+
+Status: Paid
+Ralio reference: ralio_pay_123
+Amount: £38.40
+Payee: Sarah Jones
+Audit: View event logIf the request is blocked:
+Ralio Execution
+
+Not sent to Ralio
+Reason: Duplicate payment detectedThis is important: show that blocked cases never call Ralio.
+
+G. Audit Log
+Show a chronological log:
+10:04 Request created
+10:04 Orchestrator classified request as employee_reimbursement
+10:05 Reimbursement Agent started investigation
+10:05 lookup_employee returned Sarah Jones
+10:05 receipt check passed
+10:06 policy check passed
+10:06 Risk Agent passed duplicate check
+10:06 Decision: approved
+10:07 Ralio payment created
+10:08 Ralio status: paidThis can be a simple timeline/table.
+
+API Integration
+Assume the backend exposes these endpoints:
+GET /api/requests
+POST /api/requests
+GET /api/requests/:id
+POST /api/requests/:id/investigate
+POST /api/requests/:id/approve
+POST /api/requests/:id/reject
+POST /api/requests/:id/execute
+GET /api/requests/:id/audit
+GET /api/requests/:id/ralio-statusThe frontend should handle loading, success, and error states for every call.
+Use typed API clients. Do not scatter fetch calls everywhere.
+
+Frontend Data Types
+Use TypeScript types like:
+type MoneyOutRequestType =
+  | "employee_reimbursement"
+  | "supplier_invoice"
+  | "customer_refund"
+  | "partner_commission";
+
+type RequestDecision =
+  | "draft"
+  | "investigating"
+  | "approved"
+  | "needs_approval"
+  | "blocked"
+  | "rejected"
+  | "paid";
+
+type RalioStatus =
+  | "not_sent"
+  | "pending"
+  | "requires_approval"
+  | "processing"
+  | "paid"
+  | "failed";
+
+type AgentType =
+  | "orchestrator"
+  | "reimbursement_agent"
+  | "supplier_invoice_agent"
+  | "customer_refund_agent"
+  | "partner_commission_agent"
+  | "risk_duplicate_agent"
+  | "ralio_payment_agent";
+Demo Flow to Optimise For
+The UI should support this exact live demo:
+Step 1
+Open dashboard.
+Say:
+“This is TrustMe, a money-out command centre powered by specialist finance agents.”Step 2
+Open inbox.
+Show four requests:
+Employee reimbursementSupplier invoiceCustomer refundDuplicate reimbursementStep 3
+Open Sarah reimbursement.
+Click Investigate.
+Show ReAct timeline.
+Decision becomes Approved.
+Click Execute with Ralio.
+Ralio status becomes Paid.
+Step 4
+Open Northstar supplier invoice.
+Show:
+supplier existsinvoice validamount exceeds thresholddecision: needs approvalRalio not executed yetStep 5
+Open BrightPath refund.
+Show:
+customer existsoverbilling verifiedrefund amount calculatedapprovedpaid via RalioStep 6
+Open duplicate reimbursement.
+Show:
+same receipt/amount/payee detectedblocked by Risk AgentRalio not calledFinal line:
+“TrustMe decides whether money should move. Ralio safely moves it.”
+Frontend Requirements
+Must-have
+Slick dashboardMoney-out inboxCreate request modalRequest detail pageAgent ReAct timelinePolicy/risk checksDecision cardRalio execution panelAudit logDemo seed data supportResponsive enough for laptop demoNice-to-have
+Animated investigation timelineToast notificationsCommand paletteDark modeAgent cards with activity pulsesSmall network/flow diagram“Replay investigation” buttonConfetti/subtle animation when payment succeedsDo not spend too much time on dark mode. The main thing is the case detail page and the agent timeline.
+
+Empty/Error States
+Handle:
+backend unavailableinvestigation failedRalio execution failedrequest not foundno requests yetShow friendly messages, not raw stack traces.
+
+Mock Mode
+If backend is not ready, create a local mock data layer with the same TypeScript types.
+The UI should be able to run in:
+VITE_API_MODE=mock
+VITE_API_MODE=liveor equivalent.
+This keeps the demo safe even if the backend has issues.
+
+What Good Looks Like
+The finished UI should make judges immediately understand:
+There is one inbox for company money-out requests.Multiple specialist agents investigate different request types.The agents use ReAct-style tool calls, not just one-shot chat.The system can approve, block, escalate, and pay.Ralio is used for payment execution and audit.The product is safe enough to handle real payment workflows.The frontend should make the agent reasoning visible. That is the most important part.
+The demo should feel like:
+“This is what a future AI finance ops team looks like.”
