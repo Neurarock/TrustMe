@@ -1,0 +1,50 @@
+@import "tailwindcss";
+
+/* Class-based dark mode: anything inside a `.dark` container opts in.
+   The host (admin) experience is wrapped in `.dark`; the client stays light. */
+@custom-variant dark (&:where(.dark, .dark *));
+
+@theme {
+  --color-navy-950: #0a0f1f;
+  --color-navy-900: #0f1629;
+  --color-navy-800: #161f38;
+  --color-navy-700: #1f2a47;
+  --color-navy-600: #2b3a5e;
+
+  /* Apple-leaning system stack first (San Francisco on macOS/iOS). */
+  --font-sans: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Inter",
+    ui-sans-serif, system-ui, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+}
+
+:root {
+  color-scheme: light;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+  letter-spacing: -0.011em;
+  background: #f6f7f9;
+}
+
+/* Thin, calm scrollbars to match the cockpit feel. */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: rgb(148 163 184 / 0.4) transparent;
+}
+*::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+*::-webkit-scrollbar-thumb {
+  background-color: rgb(148 163 184 / 0.4);
+  border-radius: 9999px;
+}
