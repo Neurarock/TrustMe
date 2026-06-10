@@ -2,14 +2,15 @@
 
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, List
 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 
 from backend.app.container import get_service
-from backend.app.models import CreateMoneyOutRequest
 from backend.app.services import TrustMeService, TrustMeServiceError
+from backend.app.api import schemas
+from backend.app.api.mappers import to_frontend_request, from_create_input
 
 
 router = APIRouter(prefix="/api/requests", tags=["requests"])
@@ -22,15 +23,20 @@ class ApprovalPayload(BaseModel):
 
 @router.post("")
 def create_request(
-    payload: CreateMoneyOutRequest,
+    payload: schemas.CreateRequestInput,
     service: TrustMeService = Depends(get_service),
 ) -> dict[str, Any]:
-    return service.create_request(payload).model_dump(mode="json")
+    domain_req = from_create_input(payload)
+    created = service.create_request(domain_req)
+    return to_frontend_request(created, service).model_dump(mode="json", by_alias=True)
 
 
 @router.get("")
-def list_requests(service: TrustMeService = Depends(get_service)) -> list[dict[str, Any]]:
-    return [request.model_dump(mode="json") for request in service.list_requests()]
+def list_requests(service: TrustMeService = Depends(get_service)) -> List[dict[str, Any]]:
+    return [
+        to_frontend_request(request, service).model_dump(mode="json", by_alias=True)
+        for request in service.list_requests()
+    ]
 
 
 @router.get("/{request_id}")
@@ -39,7 +45,8 @@ def get_request(
     service: TrustMeService = Depends(get_service),
 ) -> dict[str, Any]:
     try:
-        return service.get_request(request_id).model_dump(mode="json")
+        request = service.get_request(request_id)
+        return to_frontend_request(request, service).model_dump(mode="json", by_alias=True)
     except TrustMeServiceError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
 
@@ -50,7 +57,9 @@ def investigate_request(
     service: TrustMeService = Depends(get_service),
 ) -> dict[str, Any]:
     try:
-        return service.investigate_request(request_id).model_dump(mode="json")
+        service.investigate_request(request_id)
+        request = service.get_request(request_id)
+        return to_frontend_request(request, service).model_dump(mode="json", by_alias=True)
     except TrustMeServiceError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
@@ -62,11 +71,13 @@ def approve_request(
     service: TrustMeService = Depends(get_service),
 ) -> dict[str, Any]:
     try:
-        return service.approve_request(
+        service.approve_request(
             request_id,
             approved_by=payload.actor,
             note=payload.note,
-        ).model_dump(mode="json")
+        )
+        request = service.get_request(request_id)
+        return to_frontend_request(request, service).model_dump(mode="json", by_alias=True)
     except TrustMeServiceError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
@@ -78,11 +89,13 @@ def reject_request(
     service: TrustMeService = Depends(get_service),
 ) -> dict[str, Any]:
     try:
-        return service.reject_request(
+        service.reject_request(
             request_id,
             rejected_by=payload.actor,
             note=payload.note,
-        ).model_dump(mode="json")
+        )
+        request = service.get_request(request_id)
+        return to_frontend_request(request, service).model_dump(mode="json", by_alias=True)
     except TrustMeServiceError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
@@ -93,7 +106,9 @@ def execute_request(
     service: TrustMeService = Depends(get_service),
 ) -> dict[str, Any]:
     try:
-        return service.execute_approved_payment(request_id).model_dump(mode="json")
+        service.execute_approved_payment(request_id)
+        request = service.get_request(request_id)
+        return to_frontend_request(request, service).model_dump(mode="json", by_alias=True)
     except TrustMeServiceError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
@@ -104,7 +119,9 @@ def get_audit(
     service: TrustMeService = Depends(get_service),
 ) -> list[dict[str, Any]]:
     try:
-        return [event.model_dump(mode="json") for event in service.get_audit_trail(request_id)]
+        request = service.get_request(request_id)
+        frontend_req = to_frontend_request(request, service)
+        return [a.model_dump(mode="json", by_alias=True) for a in frontend_req.audit]
     except TrustMeServiceError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
 
@@ -115,9 +132,8 @@ def get_ralio_status(
     service: TrustMeService = Depends(get_service),
 ) -> dict[str, Any] | None:
     try:
-        service.get_request(request_id)
-        payment = service.get_payment_status(request_id)
-        return payment.model_dump(mode="json") if payment else None
+        request = service.get_request(request_id)
+        frontend_req = to_frontend_request(request, service)
+        return frontend_req.ralio.model_dump(mode="json", by_alias=True)
     except TrustMeServiceError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
-

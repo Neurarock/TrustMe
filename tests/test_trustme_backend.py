@@ -282,7 +282,14 @@ def test_fastapi_lifecycle_uses_shared_service(tmp_path: Path) -> None:
 
     created = client.post(
         "/api/requests",
-        json={"description": "Refund BrightPath £260 because we overbilled them."},
+        json={
+            "title": "Test request",
+            "type": "unknown",
+            "payee": "Test Payee",
+            "amount": 0,
+            "currency": "GBP",
+            "description": "Refund BrightPath £260 because we overbilled them."
+        },
     )
     assert created.status_code == 200
     request_id = created.json()["id"]
@@ -293,11 +300,11 @@ def test_fastapi_lifecycle_uses_shared_service(tmp_path: Path) -> None:
 
     executed = client.post(f"/api/requests/{request_id}/execute")
     assert executed.status_code == 200
-    assert executed.json()["status"] == "completed"
+    assert executed.json()["ralioStatus"] == "paid"
 
     audit = client.get(f"/api/requests/{request_id}/audit")
     assert audit.status_code == 200
-    assert any(event["action"] == "payment.ralio_response" for event in audit.json())
+    assert any("Ralio adapter returned" in event["message"] for event in audit.json())
 
 
 @pytest.mark.anyio
@@ -339,7 +346,7 @@ async def test_mcp_tools_use_shared_service(tmp_path: Path, monkeypatch: pytest.
     audit = _mcp_payload(
         await mcp.call_tool("get_payment_audit_trail", {"request_id": request_id})
     )
-    assert any(event["action"] == "payment.ralio_response" for event in audit)
+    assert any("Ralio adapter returned" in event["summary"] for event in audit)
 
 
 def _mcp_payload(result: Any) -> Any:

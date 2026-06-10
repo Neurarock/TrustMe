@@ -270,14 +270,23 @@ class TrustMeService:
     def seed_demo_requests(self) -> None:
         if self.repository.request_count() > 0:
             return
-        descriptions = [
-            "Reimburse Sarah £38.40 for client lunch with Acme.",
-            "Pay Northstar Design £420 for invoice INV-2042.",
-            "Refund BrightPath £260 because we overbilled them.",
-            "Reimburse Sarah £38.40 again for the same lunch.",
+        cases = [
+            {"title": "Sarah reimbursement", "desc": "Reimburse Sarah £38.40 for client lunch with Acme.", "payee": "Sarah Jones", "amount": 38.40},
+            {"title": "Northstar invoice", "desc": "Pay Northstar Design £420 for invoice INV-2042.", "payee": "Northstar Design", "amount": 420.00},
+            {"title": "BrightPath refund", "desc": "Refund BrightPath £260 because we overbilled them.", "payee": "BrightPath", "amount": 260.00},
+            {"title": "Duplicate Sarah reimbursement", "desc": "Reimburse Sarah £38.40 again for the same lunch.", "payee": "Sarah Jones", "amount": 38.40},
         ]
-        for description in descriptions:
-            self.create_request(CreateMoneyOutRequest(description=description))
+        from decimal import Decimal
+        for case in cases:
+            self.create_request(
+                CreateMoneyOutRequest(
+                    description=case["desc"],
+                    amount=Decimal(str(case["amount"])),
+                    currency="GBP",
+                    payee=case["payee"],
+                    metadata={"title": case["title"], "source": "client"}
+                )
+            )
 
     def _deps(self, request: MoneyOutRequest) -> TrustMeAgentDeps:
         return TrustMeAgentDeps(

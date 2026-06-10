@@ -56,7 +56,14 @@ def main() -> int:
 def _run_case(client: httpx.Client, base_url: str, case: dict[str, Any]) -> None:
     created = client.post(
         f"{base_url}/api/requests",
-        json={"description": case["description"]},
+        json={
+            "title": case["name"],
+            "type": "unknown",
+            "payee": "Demo Payee",
+            "amount": 0,
+            "currency": "GBP",
+            "description": case["description"]
+        },
     )
     created.raise_for_status()
     request_id = created.json()["id"]
@@ -84,8 +91,8 @@ def _run_case(client: httpx.Client, base_url: str, case: dict[str, Any]) -> None
         executed = client.post(f"{base_url}/api/requests/{request_id}/execute")
         if executed.status_code >= 400:
             raise RuntimeError(f"{case['name']} execute failed: {executed.text}")
-        status = executed.json()["status"]
-        if status not in {"completed", "submitted", "requires_approval"}:
+        status = executed.json()["ralioStatus"]
+        if status not in {"paid", "pending", "requires_approval"}:
             raise RuntimeError(f"{case['name']} returned unexpected payment {status}.")
     else:
         rejected = client.post(f"{base_url}/api/requests/{request_id}/execute")

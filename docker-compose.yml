@@ -15,5 +15,16 @@ services:
     volumes:
       - trustme-data:/app/var
 
+  frontend:
+    build:
+      context: ./frontend
+    environment:
+      VITE_API_TARGET: "http://trustme:8000"
+      VITE_API_MODE: "live"
+    ports:
+      - "5173:5173"
+    depends_on:
+      - trustme
+
 volumes:
   trustme-data:
